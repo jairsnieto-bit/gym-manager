@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, LogOut, Plus, Edit, Trash2, Search, Package, CreditCard, AlertTriangle, Save, X, FileText } from 'lucide-react';
+import { Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, LogOut, Plus, Edit, Trash2, Search, Package, CreditCard, AlertTriangle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const App = () => {
@@ -9,59 +9,10 @@ const App = () => {
   const [machines, setMachines] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [invoices, setInvoices] = useState([]);
-  const [plans, setPlans] = useState([]); // Nueva sección para planes
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // States for modals
-  const [showClientModal, setShowClientModal] = useState(false);
-  const [showMachineModal, setShowMachineModal] = useState(false);
-  const [showInventoryModal, setShowInventoryModal] = useState(false);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [showPlanModal, setShowPlanModal] = useState(false); // Modal para planes
-
-  // Form data states
-  const [clientForm, setClientForm] = useState({
-    name: '',
-    email: '',
-    plan_id: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: '',
-    status: 'active',
-    last_payment: new Date().toISOString().split('T')[0]
-  });
-
-  const [machineForm, setMachineForm] = useState({
-    name: '',
-    category: 'Cardio',
-    status: 'working',
-    last_maintenance: new Date().toISOString().split('T')[0]
-  });
-
-  const [inventoryForm, setInventoryForm] = useState({
-    name: '',
-    category: 'Supplements',
-    stock: 0,
-    price: 0,
-    min_stock: 5
-  });
-
-  const [invoiceForm, setInvoiceForm] = useState({
-    client_name: '',
-    items: [''],
-    total: 0,
-    date: new Date().toISOString().split('T')[0],
-    status: 'paid'
-  });
-
-  const [planForm, setPlanForm] = useState({
-    name: '',
-    price: 0,
-    duration_days: 30,
-    description: ''
-  });
 
   // Cargar datos desde Supabase
   useEffect(() => {
@@ -69,19 +20,10 @@ const App = () => {
       try {
         setLoading(true);
         
-        // Cargar planes primero (necesario para los clientes)
-        const { data: plansData, error: plansError } = await supabase
-          .from('plans')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (plansError) throw plansError;
-        setPlans(plansData || []);
-
-        // Cargar clientes con relación a planes
+        // Cargar clientes
         const { data: clientsData, error: clientsError } = await supabase
           .from('clients')
-          .select('*, plans(name, price)')
+          .select('*')
           .order('created_at', { ascending: false });
         
         if (clientsError) throw clientsError;
@@ -184,122 +126,36 @@ const App = () => {
     setNotifications(newNotifications);
   };
 
-  // Funciones CRUD para planes
-  const addPlan = async (planData) => {
-    try {
-      const { data, error } = await supabase
-        .from('plans')
-        .insert([planData])
-        .select();
-      
-      if (error) throw error;
-      setPlans([...plans, data[0]]);
-      alert('Plan agregado exitosamente');
-      setShowPlanModal(false);
-      resetPlanForm();
-    } catch (error) {
-      console.error('Error adding plan:', error);
-      alert('Error al agregar plan: ' + error.message);
-    }
-  };
-
-  const updatePlan = async (id, planData) => {
-    try {
-      const { error } = await supabase
-        .from('plans')
-        .update(planData)
-        .eq('id', id);
-      
-      if (error) throw error;
-      setPlans(plans.map(plan => plan.id === id ? { ...plan, ...planData } : plan));
-      alert('Plan actualizado exitosamente');
-      setShowPlanModal(false);
-      resetPlanForm();
-    } catch (error) {
-      console.error('Error updating plan:', error);
-      alert('Error al actualizar plan: ' + error.message);
-    }
-  };
-
-  const deletePlan = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este plan? Los clientes asignados a este plan podrían verse afectados.')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('plans')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      setPlans(plans.filter(plan => plan.id !== id));
-      alert('Plan eliminado exitosamente');
-    } catch (error) {
-      console.error('Error deleting plan:', error);
-      alert('Error al eliminar plan: ' + error.message);
-    }
-  };
-
-  // Funciones CRUD para clientes (actualizadas para usar plan_id)
+  // Funciones CRUD para clientes
   const addClient = async (clientData) => {
     try {
-      // Calcular end_date basado en la duración del plan
-      const selectedPlan = plans.find(plan => plan.id === clientData.plan_id);
-      if (selectedPlan) {
-        const startDate = new Date(clientData.start_date);
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
-        clientData.end_date = endDate.toISOString().split('T')[0];
-      }
-      
       const { data, error } = await supabase
         .from('clients')
         .insert([clientData])
-        .select('*, plans(name, price)');
+        .select();
       
       if (error) throw error;
       setClients([...clients, data[0]]);
       alert('Cliente agregado exitosamente');
-      setShowClientModal(false);
-      resetClientForm();
     } catch (error) {
       console.error('Error adding client:', error);
-      alert('Error al agregar cliente: ' + error.message);
+      alert('Error al agregar cliente');
     }
   };
 
   const updateClient = async (id, clientData) => {
     try {
-      // Recalcular end_date si cambia el plan
-      if (clientData.plan_id) {
-        const selectedPlan = plans.find(plan => plan.id === clientData.plan_id);
-        if (selectedPlan) {
-          const startDate = clientData.start_date ? new Date(clientData.start_date) : new Date();
-          const endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
-          clientData.end_date = endDate.toISOString().split('T')[0];
-        }
-      }
-      
       const { error } = await supabase
         .from('clients')
         .update(clientData)
         .eq('id', id);
       
       if (error) throw error;
-      
-      // Recargar clientes para obtener los datos actualizados con planes
-      const { data: updatedClients } = await supabase
-        .from('clients')
-        .select('*, plans(name, price)')
-        .order('created_at', { ascending: false });
-      setClients(updatedClients || []);
-      
+      setClients(clients.map(client => client.id === id ? { ...client, ...clientData } : client));
       alert('Cliente actualizado exitosamente');
-      setShowClientModal(false);
-      resetClientForm();
     } catch (error) {
       console.error('Error updating client:', error);
-      alert('Error al actualizar cliente: ' + error.message);
+      alert('Error al actualizar cliente');
     }
   };
 
@@ -317,7 +173,7 @@ const App = () => {
       alert('Cliente eliminado exitosamente');
     } catch (error) {
       console.error('Error deleting client:', error);
-      alert('Error al eliminar cliente: ' + error.message);
+      alert('Error al eliminar cliente');
     }
   };
 
@@ -332,8 +188,6 @@ const App = () => {
       if (error) throw error;
       setMachines([...machines, data[0]]);
       alert('Máquina agregada exitosamente');
-      setShowMachineModal(false);
-      resetMachineForm();
     } catch (error) {
       console.error('Error adding machine:', error);
       alert('Error al agregar máquina');
@@ -350,8 +204,6 @@ const App = () => {
       if (error) throw error;
       setMachines(machines.map(machine => machine.id === id ? { ...machine, ...machineData } : machine));
       alert('Máquina actualizada exitosamente');
-      setShowMachineModal(false);
-      resetMachineForm();
     } catch (error) {
       console.error('Error updating machine:', error);
       alert('Error al actualizar máquina');
@@ -387,8 +239,6 @@ const App = () => {
       if (error) throw error;
       setInventory([...inventory, data[0]]);
       alert('Producto agregado exitosamente');
-      setShowInventoryModal(false);
-      resetInventoryForm();
     } catch (error) {
       console.error('Error adding inventory item:', error);
       alert('Error al agregar producto');
@@ -405,8 +255,6 @@ const App = () => {
       if (error) throw error;
       setInventory(inventory.map(item => item.id === id ? { ...item, ...itemData } : item));
       alert('Producto actualizado exitosamente');
-      setShowInventoryModal(false);
-      resetInventoryForm();
     } catch (error) {
       console.error('Error updating inventory item:', error);
       alert('Error al actualizar producto');
@@ -442,8 +290,6 @@ const App = () => {
       if (error) throw error;
       setInvoices([...invoices, data[0]]);
       alert('Factura agregada exitosamente');
-      setShowInvoiceModal(false);
-      resetInvoiceForm();
     } catch (error) {
       console.error('Error adding invoice:', error);
       alert('Error al agregar factura');
@@ -460,8 +306,6 @@ const App = () => {
       if (error) throw error;
       setInvoices(invoices.map(invoice => invoice.id === id ? { ...invoice, ...invoiceData } : invoice));
       alert('Factura actualizada exitosamente');
-      setShowInvoiceModal(false);
-      resetInvoiceForm();
     } catch (error) {
       console.error('Error updating invoice:', error);
       alert('Error al actualizar factura');
@@ -486,62 +330,11 @@ const App = () => {
     }
   };
 
-  // Reset forms
-  const resetClientForm = () => {
-    setClientForm({
-      name: '',
-      email: '',
-      plan_id: plans.length > 0 ? plans[0].id : '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: '',
-      status: 'active',
-      last_payment: new Date().toISOString().split('T')[0]
-    });
-  };
-
-  const resetMachineForm = () => {
-    setMachineForm({
-      name: '',
-      category: 'Cardio',
-      status: 'working',
-      last_maintenance: new Date().toISOString().split('T')[0]
-    });
-  };
-
-  const resetInventoryForm = () => {
-    setInventoryForm({
-      name: '',
-      category: 'Supplements',
-      stock: 0,
-      price: 0,
-      min_stock: 5
-    });
-  };
-
-  const resetInvoiceForm = () => {
-    setInvoiceForm({
-      client_name: '',
-      items: [''],
-      total: 0,
-      date: new Date().toISOString().split('T')[0],
-      status: 'paid'
-    });
-  };
-
-  const resetPlanForm = () => {
-    setPlanForm({
-      name: '',
-      price: 0,
-      duration_days: 30,
-      description: ''
-    });
-  };
-
   // Filter data based on search term
   const filteredClients = clients.filter(client =>
     client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.plans?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    client.plan?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredMachines = machines.filter(machine =>
@@ -552,11 +345,6 @@ const App = () => {
   const filteredInventory = inventory.filter(item =>
     item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.category?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredPlans = plans.filter(plan =>
-    plan.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    plan.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredInvoices = invoices.filter(invoice =>
@@ -672,15 +460,6 @@ const App = () => {
                     >
                       <Calendar className="mr-3 h-4 w-4" />
                       Dashboard
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('plans')}
-                      className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                        activeTab === 'plans' ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <FileText className="mr-3 h-4 w-4" />
-                      Planes
                     </button>
                     <button
                       onClick={() => setActiveTab('clients')}
@@ -827,82 +606,22 @@ const App = () => {
               </div>
             )}
 
-            {/* NUEVO MÓDULO: Planes */}
-            {activeTab === 'plans' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h1 className="text-2xl font-bold text-gray-900">Gestión de Planes</h1>
-                  <button 
-                    onClick={() => {
-                      resetPlanForm();
-                      setShowPlanModal(true);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nuevo Plan
-                  </button>
-                </div>
-                
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duración</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredPlans.map(plan => (
-                          <tr key={plan.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{plan.name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${plan.price}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{plan.duration_days} días</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{plan.description || '-'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <button 
-                                onClick={() => {
-                                  setPlanForm({
-                                    id: plan.id,
-                                    name: plan.name,
-                                    price: plan.price,
-                                    duration_days: plan.duration_days,
-                                    description: plan.description
-                                  });
-                                  setShowPlanModal(true);
-                                }}
-                                className="text-blue-600 hover:text-blue-900 mr-3"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-                              <button 
-                                onClick={() => deletePlan(plan.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeTab === 'clients' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h1 className="text-2xl font-bold text-gray-900">Gestión de Clientes</h1>
                   <button 
                     onClick={() => {
-                      resetClientForm();
-                      setShowClientModal(true);
+                      const newClient = {
+                        name: 'Nuevo Cliente',
+                        email: 'cliente@email.com',
+                        plan: 'Basic',
+                        start_date: new Date().toISOString().split('T')[0],
+                        end_date: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0],
+                        status: 'active',
+                        last_payment: new Date().toISOString().split('T')[0]
+                      };
+                      addClient(newClient);
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
                   >
@@ -918,7 +637,6 @@ const App = () => {
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -931,8 +649,7 @@ const App = () => {
                               <div className="text-sm font-medium text-gray-900">{client.name}</div>
                               <div className="text-sm text-gray-500">{client.email}</div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.plans?.name || 'Sin plan'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${client.plans?.price || 0}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.plan}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.end_date}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -947,17 +664,8 @@ const App = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <button 
                                 onClick={() => {
-                                  setClientForm({
-                                    id: client.id,
-                                    name: client.name,
-                                    email: client.email,
-                                    plan_id: client.plan_id,
-                                    start_date: client.start_date,
-                                    end_date: client.end_date,
-                                    status: client.status,
-                                    last_payment: client.last_payment
-                                  });
-                                  setShowClientModal(true);
+                                  const updatedClient = {...client, name: client.name + ' (Editado)'};
+                                  updateClient(client.id, updatedClient);
                                 }}
                                 className="text-blue-600 hover:text-blue-900 mr-3"
                               >
@@ -985,8 +693,13 @@ const App = () => {
                   <h1 className="text-2xl font-bold text-gray-900">Gestión de Máquinas</h1>
                   <button 
                     onClick={() => {
-                      resetMachineForm();
-                      setShowMachineModal(true);
+                      const newMachine = {
+                        name: 'Nueva Máquina',
+                        category: 'Cardio',
+                        status: 'working',
+                        last_maintenance: new Date().toISOString().split('T')[0]
+                      };
+                      addMachine(newMachine);
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
                   >
@@ -1023,14 +736,8 @@ const App = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <button 
                                 onClick={() => {
-                                  setMachineForm({
-                                    id: machine.id,
-                                    name: machine.name,
-                                    category: machine.category,
-                                    status: machine.status,
-                                    last_maintenance: machine.last_maintenance
-                                  });
-                                  setShowMachineModal(true);
+                                  const updatedMachine = {...machine, name: machine.name + ' (Editado)'};
+                                  updateMachine(machine.id, updatedMachine);
                                 }}
                                 className="text-blue-600 hover:text-blue-900 mr-3"
                               >
@@ -1058,8 +765,14 @@ const App = () => {
                   <h1 className="text-2xl font-bold text-gray-900">Inventario de Tienda</h1>
                   <button 
                     onClick={() => {
-                      resetInventoryForm();
-                      setShowInventoryModal(true);
+                      const newItem = {
+                        name: 'Nuevo Producto',
+                        category: 'Supplements',
+                        stock: 20,
+                        price: 25.99,
+                        min_stock: 5
+                      };
+                      addInventoryItem(newItem);
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
                   >
@@ -1096,15 +809,8 @@ const App = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <button 
                                 onClick={() => {
-                                  setInventoryForm({
-                                    id: item.id,
-                                    name: item.name,
-                                    category: item.category,
-                                    stock: item.stock,
-                                    price: item.price,
-                                    min_stock: item.min_stock
-                                  });
-                                  setShowInventoryModal(true);
+                                  const updatedItem = {...item, name: item.name + ' (Editado)'};
+                                  updateInventoryItem(item.id, updatedItem);
                                 }}
                                 className="text-blue-600 hover:text-blue-900 mr-3"
                               >
@@ -1132,8 +838,14 @@ const App = () => {
                   <h1 className="text-2xl font-bold text-gray-900">Facturación</h1>
                   <button 
                     onClick={() => {
-                      resetInvoiceForm();
-                      setShowInvoiceModal(true);
+                      const newInvoice = {
+                        client_name: 'Nuevo Cliente',
+                        items: ['Premium Plan'],
+                        total: 120.00,
+                        date: new Date().toISOString().split('T')[0],
+                        status: 'paid'
+                      };
+                      addInvoice(newInvoice);
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
                   >
@@ -1167,30 +879,6 @@ const App = () => {
                               }`}>
                                 {invoice.status === 'paid' ? 'Pagado' : 'Vencido'}
                               </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <button 
-                                onClick={() => {
-                                  setInvoiceForm({
-                                    id: invoice.id,
-                                    client_name: invoice.client_name,
-                                    items: invoice.items,
-                                    total: invoice.total,
-                                    date: invoice.date,
-                                    status: invoice.status
-                                  });
-                                  setShowInvoiceModal(true);
-                                }}
-                                className="text-blue-600 hover:text-blue-900 mr-3"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </button>
-                              <button 
-                                onClick={() => deleteInvoice(invoice.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1285,556 +973,6 @@ const App = () => {
           </div>
         </div>
       </div>
-
-      {/* Modals */}
-      {/* Plan Modal */}
-      {showPlanModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                {planForm.id ? 'Editar Plan' : 'Agregar Plan'}
-              </h2>
-              <button 
-                onClick={() => setShowPlanModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (planForm.name && planForm.price >= 0 && planForm.duration_days > 0) {
-                if (planForm.id) {
-                  updatePlan(planForm.id, planForm);
-                } else {
-                  addPlan(planForm);
-                }
-              } else {
-                alert('Por favor, completa todos los campos correctamente');
-              }
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Plan *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={planForm.name}
-                  onChange={(e) => setPlanForm({...planForm, name: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Precio ($) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={planForm.price}
-                  onChange={(e) => setPlanForm({...planForm, price: parseFloat(e.target.value) || 0})}
-                  min="0"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Duración (días) *</label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={planForm.duration_days}
-                  onChange={(e) => setPlanForm({...planForm, duration_days: parseInt(e.target.value) || 30})}
-                  min="1"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={planForm.description}
-                  onChange={(e) => setPlanForm({...planForm, description: e.target.value})}
-                  rows="3"
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPlanModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Client Modal */}
-      {showClientModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                {clientForm.id ? 'Editar Cliente' : 'Agregar Cliente'}
-              </h2>
-              <button 
-                onClick={() => setShowClientModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (clientForm.name && clientForm.email && clientForm.plan_id) {
-                if (clientForm.id) {
-                  updateClient(clientForm.id, clientForm);
-                } else {
-                  addClient(clientForm);
-                }
-              } else {
-                alert('Por favor, completa los campos obligatorios');
-              }
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.name}
-                  onChange={(e) => setClientForm({...clientForm, name: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.email}
-                  onChange={(e) => setClientForm({...clientForm, email: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Plan *</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.plan_id}
-                  onChange={(e) => {
-                    const selectedPlanId = e.target.value;
-                    setClientForm({...clientForm, plan_id: selectedPlanId});
-                    // Recalcular fecha de vencimiento
-                    const selectedPlan = plans.find(plan => plan.id === selectedPlanId);
-                    if (selectedPlan) {
-                      const startDate = new Date(clientForm.start_date);
-                      const endDate = new Date(startDate);
-                      endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
-                      setClientForm(prev => ({...prev, end_date: endDate.toISOString().split('T')[0]}));
-                    }
-                  }}
-                  required
-                >
-                  <option value="">Selecciona un plan</option>
-                  {plans.map(plan => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name} - ${plan.price} ({plan.duration_days} días)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.start_date}
-                  onChange={(e) => {
-                    const newStartDate = e.target.value;
-                    setClientForm({...clientForm, start_date: newStartDate});
-                    // Recalcular fecha de vencimiento
-                    if (clientForm.plan_id) {
-                      const selectedPlan = plans.find(plan => plan.id === clientForm.plan_id);
-                      if (selectedPlan) {
-                        const startDate = new Date(newStartDate);
-                        const endDate = new Date(startDate);
-                        endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
-                        setClientForm(prev => ({...prev, end_date: endDate.toISOString().split('T')[0]}));
-                      }
-                    }
-                  }}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.end_date}
-                  readOnly
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.status}
-                  onChange={(e) => setClientForm({...clientForm, status: e.target.value})}
-                >
-                  <option value="active">Activo</option>
-                  <option value="expiring">Por vencer</option>
-                  <option value="expired">Vencido</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Último Pago</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={clientForm.last_payment}
-                  onChange={(e) => setClientForm({...clientForm, last_payment: e.target.value})}
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowClientModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Machine Modal */}
-      {showMachineModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Agregar Máquina</h2>
-              <button 
-                onClick={() => setShowMachineModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (machineForm.name && machineForm.category) {
-                if (machineForm.id) {
-                  updateMachine(machineForm.id, machineForm);
-                } else {
-                  addMachine(machineForm);
-                }
-              } else {
-                alert('Por favor, completa los campos obligatorios');
-              }
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={machineForm.name}
-                  onChange={(e) => setMachineForm({...machineForm, name: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={machineForm.category}
-                  onChange={(e) => setMachineForm({...machineForm, category: e.target.value})}
-                >
-                  <option value="Cardio">Cardio</option>
-                  <option value="Strength">Fuerza</option>
-                  <option value="Flexibility">Flexibilidad</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={machineForm.status}
-                  onChange={(e) => setMachineForm({...machineForm, status: e.target.value})}
-                >
-                  <option value="working">Operativa</option>
-                  <option value="maintenance">Mantenimiento</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Último Mantenimiento</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={machineForm.last_maintenance}
-                  onChange={(e) => setMachineForm({...machineForm, last_maintenance: e.target.value})}
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowMachineModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Inventory Modal */}
-      {showInventoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Agregar Producto</h2>
-              <button 
-                onClick={() => setShowInventoryModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (inventoryForm.name && inventoryForm.category) {
-                if (inventoryForm.id) {
-                  updateInventoryItem(inventoryForm.id, inventoryForm);
-                } else {
-                  addInventoryItem(inventoryForm);
-                }
-              } else {
-                alert('Por favor, completa los campos obligatorios');
-              }
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={inventoryForm.name}
-                  onChange={(e) => setInventoryForm({...inventoryForm, name: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={inventoryForm.category}
-                  onChange={(e) => setInventoryForm({...inventoryForm, category: e.target.value})}
-                >
-                  <option value="Supplements">Suplementos</option>
-                  <option value="Accessories">Accesorios</option>
-                  <option value="Clothing">Ropa</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={inventoryForm.stock}
-                  onChange={(e) => setInventoryForm({...inventoryForm, stock: parseInt(e.target.value)})}
-                  min="0"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Precio</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={inventoryForm.price}
-                  onChange={(e) => setInventoryForm({...inventoryForm, price: parseFloat(e.target.value)})}
-                  min="0"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo</label>
-                <input
-                  type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={inventoryForm.min_stock}
-                  onChange={(e) => setInventoryForm({...inventoryForm, min_stock: parseInt(e.target.value)})}
-                  min="0"
-                  required
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowInventoryModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Invoice Modal */}
-      {showInvoiceModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Agregar Factura</h2>
-              <button 
-                onClick={() => setShowInvoiceModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (invoiceForm.client_name && invoiceForm.items.length > 0) {
-                if (invoiceForm.id) {
-                  updateInvoice(invoiceForm.id, invoiceForm);
-                } else {
-                  addInvoice(invoiceForm);
-                }
-              } else {
-                alert('Por favor, completa los campos obligatorios');
-              }
-            }}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={invoiceForm.client_name}
-                  onChange={(e) => setInvoiceForm({...invoiceForm, client_name: e.target.value})}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Items</label>
-                <div className="space-y-2">
-                  {invoiceForm.items.map((item, index) => (
-                    <div key={index} className="flex space-x-2">
-                      <input
-                        type="text"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={item}
-                        onChange={(e) => {
-                          const newItems = [...invoiceForm.items];
-                          newItems[index] = e.target.value;
-                          setInvoiceForm({...invoiceForm, items: newItems});
-                        }}
-                        placeholder="Ej: Premium Plan"
-                      />
-                      {invoiceForm.items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newItems = invoiceForm.items.filter((_, i) => i !== index);
-                            setInvoiceForm({...invoiceForm, items: newItems});
-                          }}
-                          className="px-2 py-1 text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setInvoiceForm({...invoiceForm, items: [...invoiceForm.items, '']})}
-                    className="mt-1 text-blue-600 hover:text-blue-800 text-sm"
-                  >
-                    + Añadir Item
-                  </button>
-                </div>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={invoiceForm.total}
-                  onChange={(e) => setInvoiceForm({...invoiceForm, total: parseFloat(e.target.value)})}
-                  min="0"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-                <input
-                  type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={invoiceForm.date}
-                  onChange={(e) => setInvoiceForm({...invoiceForm, date: e.target.value})}
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={invoiceForm.status}
-                  onChange={(e) => setInvoiceForm({...invoiceForm, status: e.target.value})}
-                >
-                  <option value="paid">Pagado</option>
-                  <option value="overdue">Vencido</option>
-                </select>
-              </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowInvoiceModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
