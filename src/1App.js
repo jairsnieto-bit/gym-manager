@@ -1,239 +1,70 @@
+
 import React, { useState, useEffect } from 'react';
-import { Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, LogOut, Plus, Edit, Trash2, Search, Package, CreditCard, AlertTriangle } from 'lucide-react';
-import { supabase } from './supabaseClient';
+import { Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, LogOut, Plus, Edit, Trash2, Search, Filter, Package, CreditCard, AlertTriangle } from 'lucide-react';
+
+// Mock data for demonstration
+const mockClients = [
+  { id: 1, name: 'Juan Pérez', email: 'juan@email.com', plan: 'Premium', startDate: '2024-01-15', endDate: '2024-04-15', status: 'active', lastPayment: '2024-01-15' },
+  { id: 2, name: 'María García', email: 'maria@email.com', plan: 'Basic', startDate: '2024-02-01', endDate: '2024-03-01', status: 'expiring', lastPayment: '2024-02-01' },
+  { id: 3, name: 'Carlos Rodríguez', email: 'carlos@email.com', plan: 'Premium', startDate: '2023-12-01', endDate: '2024-03-01', status: 'expired', lastPayment: '2023-12-01' },
+];
+
+const mockMachines = [
+  { id: 1, name: 'Treadmill Pro', category: 'Cardio', status: 'working', lastMaintenance: '2024-02-10' },
+  { id: 2, name: 'Bench Press', category: 'Strength', status: 'maintenance', lastMaintenance: '2024-01-15' },
+  { id: 3, name: 'Elliptical Machine', category: 'Cardio', status: 'working', lastMaintenance: '2024-02-20' },
+];
+
+const mockInventory = [
+  { id: 1, name: 'Protein Powder', category: 'Supplements', stock: 25, price: 45.99, minStock: 10 },
+  { id: 2, name: 'Gym Towel', category: 'Accessories', stock: 8, price: 12.50, minStock: 15 },
+  { id: 3, name: 'Water Bottle', category: 'Accessories', stock: 42, price: 8.99, minStock: 20 },
+];
+
+const mockInvoices = [
+  { id: 1, client: 'Juan Pérez', items: ['Premium Plan'], total: 120.00, date: '2024-01-15', status: 'paid' },
+  { id: 2, client: 'María García', items: ['Basic Plan'], total: 60.00, date: '2024-02-01', status: 'paid' },
+  { id: 3, client: 'Carlos Rodríguez', items: ['Premium Plan'], total: 120.00, date: '2023-12-01', status: 'overdue' },
+];
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [userRole, setUserRole] = useState('admin');
-  const [clients, setClients] = useState([]);
-  const [machines, setMachines] = useState([]);
-  const [inventory, setInventory] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const [userRole, setUserRole] = useState('admin'); // 'admin' or 'user'
+  const [clients, setClients] = useState(mockClients);
+  const [machines, setMachines] = useState(mockMachines);
+  const [inventory, setInventory] = useState(mockInventory);
+  const [invoices, setInvoices] = useState(mockInvoices);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-
-  // Cargar datos desde Supabase
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Cargar clientes
-        const { data: clientsData, error: clientsError } = await supabase
-          .from('clients')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (clientsError) throw clientsError;
-        setClients(clientsData || []);
-
-        // Cargar máquinas
-        const {  machinesData, error: machinesError } = await supabase
-          .from('machines')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (machinesError) throw machinesError;
-        setMachines(machinesData || []);
-
-        // Cargar inventario
-        const {  inventoryData, error: inventoryError } = await supabase
-          .from('inventory')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (inventoryError) throw inventoryError;
-        setInventory(inventoryData || []);
-
-        // Cargar facturas
-        const {  invoicesData, error: invoicesError } = await supabase
-          .from('invoices')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (invoicesError) throw invoicesError;
-        setInvoices(invoicesData || []);
-
-        // Generar notificaciones
-        generateNotifications(clientsData || [], inventoryData || [], machinesData || []);
-        
-      } catch (error) {
-        console.error('Error loading ', error);
-        alert('Error al cargar los datos. Por favor, verifica tu conexión.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const generateNotifications = (clientsData, inventoryData, machinesData) => {
-    const newNotifications = [];
-
-    // Notificaciones de planes por vencer (3 días)
-    const expiringClients = clientsData.filter(client => {
-      const endDate = new Date(client.end_date);
-      const today = new Date();
-      const diffTime = endDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 3 && diffDays >= 0 && client.status !== 'expired';
-    });
-
-    expiringClients.forEach(client => {
-      newNotifications.push({
-        id: `exp-${client.id}`,
-        message: `Plan de ${client.name} vence en ${Math.ceil((new Date(client.end_date) - new Date()) / (1000 * 60 * 60 * 24))} días`,
-        type: 'warning'
-      });
-    });
-
-    // Notificaciones de planes vencidos
-    const expiredClients = clientsData.filter(client => {
-      return new Date(client.end_date) < new Date() && client.status !== 'expired';
-    });
-
-    expiredClients.forEach(client => {
-      newNotifications.push({
-        id: `expd-${client.id}`,
-        message: `Plan de ${client.name} ha vencido`,
-        type: 'error'
-      });
-    });
-
-    // Notificaciones de inventario bajo
-    const lowStockItems = inventoryData.filter(item => item.stock <= item.min_stock);
-    lowStockItems.forEach(item => {
-      newNotifications.push({
-        id: `stock-${item.id}`,
-        message: `Stock bajo: ${item.name} (${item.stock} unidades)`,
-        type: 'error'
-      });
-    });
-
-    // Notificaciones de mantenimiento de máquinas
-    const maintenanceMachines = machinesData.filter(machine => machine.status === 'maintenance');
-    maintenanceMachines.forEach(machine => {
-      newNotifications.push({
-        id: `maint-${machine.id}`,
-        message: `Máquina ${machine.name} necesita mantenimiento`,
-        type: 'info'
-      });
-    });
-
-    setNotifications(newNotifications);
-  };
-
-  // Funciones CRUD para clientes
-  const addClient = async (clientData) => {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .insert([clientData])
-        .select();
-      
-      if (error) throw error;
-      setClients([...clients, data[0]]);
-      alert('Cliente agregado exitosamente');
-    } catch (error) {
-      console.error('Error adding client:', error);
-      alert('Error al agregar cliente');
-    }
-  };
-
-  const updateClient = async (id, clientData) => {
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .update(clientData)
-        .eq('id', id);
-      
-      if (error) throw error;
-      setClients(clients.map(client => client.id === id ? { ...client, ...clientData } : client));
-      alert('Cliente actualizado exitosamente');
-    } catch (error) {
-      console.error('Error updating client:', error);
-      alert('Error al actualizar cliente');
-    }
-  };
-
-  const deleteClient = async (id) => {
-    if (!window.confirm('¿Estás seguro de eliminar este cliente?')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      setClients(clients.filter(client => client.id !== id));
-      alert('Cliente eliminado exitosamente');
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      alert('Error al eliminar cliente');
-    }
-  };
-
-  // Similar CRUD functions for machines, inventory, and invoices would go here
-  // (For brevity, I'll show the pattern for machines)
-
-  const addMachine = async (machineData) => {
-    try {
-      const { data, error } = await supabase
-        .from('machines')
-        .insert([machineData])
-        .select();
-      
-      if (error) throw error;
-      setMachines([...machines, data[0]]);
-      alert('Máquina agregada exitosamente');
-    } catch (error) {
-      console.error('Error adding machine:', error);
-      alert('Error al agregar máquina');
-    }
-  };
+  const [notifications, setNotifications] = useState([
+    { id: 1, message: 'Plan de María García vence en 3 días', type: 'warning' },
+    { id: 2, message: 'Stock bajo: Gym Towel (8 unidades)', type: 'error' },
+    { id: 3, message: 'Máquina Bench Press necesita mantenimiento', type: 'info' },
+  ]);
 
   // Filter data based on search term
   const filteredClients = clients.filter(client =>
-    client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.plan?.toLowerCase().includes(searchTerm.toLowerCase())
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.plan.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredMachines = machines.filter(machine =>
-    machine.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    machine.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    machine.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    machine.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredInventory = inventory.filter(item =>
-    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const expiringClients = clients.filter(client => {
-    const endDate = new Date(client.end_date);
-    const today = new Date();
-    const diffDays = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
-    return diffDays <= 3 && diffDays >= 0;
-  });
+  // Get expiring and expired clients
+  const expiringClients = clients.filter(client => client.status === 'expiring');
+  const expiredClients = clients.filter(client => client.status === 'expired');
 
-  const expiredClients = clients.filter(client => new Date(client.end_date) < new Date());
-  const lowStockItems = inventory.filter(item => item.stock <= item.min_stock);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando datos desde Supabase...</p>
-        </div>
-      </div>
-    );
-  }
+  // Get low stock items
+  const lowStockItems = inventory.filter(item => item.stock <= item.minStock);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -247,6 +78,7 @@ const App = () => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
@@ -258,6 +90,7 @@ const App = () => {
                 />
               </div>
               
+              {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -292,6 +125,7 @@ const App = () => {
                 )}
               </div>
               
+              {/* User Menu */}
               <div className="flex items-center space-x-3">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-gray-900">Administrador</p>
@@ -401,6 +235,7 @@ const App = () => {
               <div className="space-y-6">
                 <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                 
+                {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-white rounded-lg shadow-sm p-6">
                     <div className="flex items-center">
@@ -409,7 +244,7 @@ const App = () => {
                       </div>
                       <div className="ml-4">
                         <p className="text-sm font-medium text-gray-600">Clientes Activos</p>
-                        <p className="text-2xl font-bold text-gray-900">{clients.filter(c => new Date(c.end_date) >= new Date()).length}</p>
+                        <p className="text-2xl font-bold text-gray-900">{clients.filter(c => c.status === 'active').length}</p>
                       </div>
                     </div>
                   </div>
@@ -445,12 +280,13 @@ const App = () => {
                       </div>
                       <div className="ml-4">
                         <p className="text-sm font-medium text-gray-600">Productos en Stock</p>
-                        <p className="text-2xl font-bold text-gray-900">{inventory.reduce((sum, item) => sum + (item.stock || 0), 0)}</p>
+                        <p className="text-2xl font-bold text-gray-900">{inventory.reduce((sum, item) => sum + item.stock, 0)}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Recent Activity */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h2>
                   <div className="space-y-4">
@@ -472,22 +308,7 @@ const App = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h1 className="text-2xl font-bold text-gray-900">Gestión de Clientes</h1>
-                  <button 
-                    onClick={() => {
-                      // Aquí iría la lógica para abrir un modal de nuevo cliente
-                      const newClient = {
-                        name: 'Nuevo Cliente',
-                        email: 'cliente@email.com',
-                        plan: 'Basic',
-                        start_date: new Date().toISOString().split('T')[0],
-                        end_date: new Date(Date.now() + 90*24*60*60*1000).toISOString().split('T')[0],
-                        status: 'active',
-                        last_payment: new Date().toISOString().split('T')[0]
-                      };
-                      addClient(newClient);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-                  >
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
                     <Plus className="h-4 w-4 mr-2" />
                     Nuevo Cliente
                   </button>
@@ -513,32 +334,22 @@ const App = () => {
                               <div className="text-sm text-gray-500">{client.email}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.plan}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.end_date}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.endDate}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                new Date(client.end_date) >= new Date() ? 'bg-green-100 text-green-800' :
-                                new Date(client.end_date) >= new Date(Date.now() - 3*24*60*60*1000) ? 'bg-yellow-100 text-yellow-800' :
+                                client.status === 'active' ? 'bg-green-100 text-green-800' :
+                                client.status === 'expiring' ? 'bg-yellow-100 text-yellow-800' :
                                 'bg-red-100 text-red-800'
                               }`}>
-                                {new Date(client.end_date) >= new Date() ? 'Activo' :
-                                 new Date(client.end_date) >= new Date(Date.now() - 3*24*60*60*1000) ? 'Por vencer' : 'Vencido'}
+                                {client.status === 'active' ? 'Activo' :
+                                 client.status === 'expiring' ? 'Por vencer' : 'Vencido'}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <button 
-                                onClick={() => {
-                                  // Lógica para editar
-                                  const updatedClient = {...client, name: client.name + ' (Editado)'};
-                                  updateClient(client.id, updatedClient);
-                                }}
-                                className="text-blue-600 hover:text-blue-900 mr-3"
-                              >
+                              <button className="text-blue-600 hover:text-blue-900 mr-3">
                                 <Edit className="h-4 w-4" />
                               </button>
-                              <button 
-                                onClick={() => deleteClient(client.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
+                              <button className="text-red-600 hover:text-red-900">
                                 <Trash2 className="h-4 w-4" />
                               </button>
                             </td>
@@ -551,25 +362,11 @@ const App = () => {
               </div>
             )}
 
-            {/* Las otras pestañas (machines, inventory, etc.) seguirían el mismo patrón */}
-            {/* Por brevedad, muestro solo la estructura básica para machines */}
-
             {activeTab === 'machines' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h1 className="text-2xl font-bold text-gray-900">Gestión de Máquinas</h1>
-                  <button 
-                    onClick={() => {
-                      const newMachine = {
-                        name: 'Nueva Máquina',
-                        category: 'Cardio',
-                        status: 'working',
-                        last_maintenance: new Date().toISOString().split('T')[0]
-                      };
-                      addMachine(newMachine);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-                  >
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
                     <Plus className="h-4 w-4 mr-2" />
                     Nueva Máquina
                   </button>
@@ -599,7 +396,7 @@ const App = () => {
                                 {machine.status === 'working' ? 'Operativa' : 'Mantenimiento'}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{machine.last_maintenance}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{machine.lastMaintenance}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <button className="text-blue-600 hover:text-blue-900 mr-3">
                                 <Edit className="h-4 w-4" />
@@ -646,7 +443,7 @@ const App = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.category}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                item.stock <= item.min_stock ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                item.stock <= item.minStock ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                               }`}>
                                 {item.stock} unidades
                               </span>
@@ -694,8 +491,8 @@ const App = () => {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {invoices.map(invoice => (
                           <tr key={invoice.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">FAC-{invoice.id.toString().substring(0, 4)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{invoice.client_name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">FAC-{invoice.id.toString().padStart(4, '0')}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{invoice.client}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${invoice.total}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{invoice.date}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -718,39 +515,29 @@ const App = () => {
               <div className="space-y-6">
                 <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Configuración de Supabase</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Configuración General</h2>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">URL de Supabase</label>
-                      <input 
-                        type="text" 
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                        defaultValue={process.env.REACT_APP_SUPABASE_URL}
-                        readOnly
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Gimnasio</label>
+                      <input type="text" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" defaultValue="GymManager Pro" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Clave Anónima</label>
-                      <input 
-                        type="password" 
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                        defaultValue="••••••••••••••••"
-                        readOnly
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email de Notificaciones</label>
+                      <input type="email" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" defaultValue="admin@gymmanager.com" />
                     </div>
-                    <button 
-                      onClick={() => {
-                        alert('Los datos de conexión están configurados en el archivo .env');
-                      }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Ver Configuración
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Días de Anticipación para Recordatorios</label>
+                      <input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" defaultValue="3" />
+                    </div>
+                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                      Guardar Configuración
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
+            {/* User Module Views */}
             {activeTab === 'user-dashboard' && (
               <div className="space-y-6">
                 <h1 className="text-2xl font-bold text-gray-900">Mi Cuenta</h1>
@@ -760,8 +547,8 @@ const App = () => {
                       <User className="h-8 w-8 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Usuario Demo</h2>
-                      <p className="text-gray-600">usuario@gymmanager.com</p>
+                      <h2 className="text-xl font-semibold text-gray-900">Juan Pérez</h2>
+                      <p className="text-gray-600">juan@email.com</p>
                     </div>
                   </div>
                 </div>
@@ -776,8 +563,8 @@ const App = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">Plan Premium</h3>
-                        <p className="text-gray-600">Válido hasta: {new Date(Date.now() + 30*24*60*60*1000).toLocaleDateString()}</p>
-                        <p className="text-sm text-gray-500 mt-2">Último pago: {new Date().toLocaleDateString()}</p>
+                        <p className="text-gray-600">Válido hasta: 15 de abril de 2024</p>
+                        <p className="text-sm text-gray-500 mt-2">Último pago: 15 de enero de 2024</p>
                       </div>
                       <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
                         Activo
