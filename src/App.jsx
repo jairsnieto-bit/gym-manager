@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import DashboardStats from './components/layout/DashboardStats';
@@ -18,6 +18,8 @@ import StockAdjustmentModal from './components/modals/StockAdjustmentModal';
 import InventoryMovementsModal from './components/modals/InventoryMovementsModal';
 import InventoryConfigModal from './components/modals/InventoryConfigModal';
 import InventoryConfigTable from './components/tables/InventoryConfigTable';
+import PlanInvoiceTable from './components/tables/PlanInvoiceTable';
+import { billingService } from './services/billingService';
 import { useData } from './hooks/useData';
 import { generateNotifications } from './utils/notifications';
 import { planService } from './services/planService';
@@ -27,6 +29,7 @@ import { machineService } from './services/machineService';
 import { inventoryService } from './services/inventoryService';
 import { salesInvoiceService } from './services/salesInvoiceService';
 import { inventoryConfigService } from './services/inventoryConfigService';
+import { toast } from 'react-hot-toast';
 import { 
   Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, 
   LogOut, Plus, Edit, Trash2, Search, Package, CreditCard, 
@@ -126,22 +129,54 @@ const App = () => {
 
   const { clients, plans, trainers, machines, inventory, salesInvoices, categories, locations, units, loading, error, refetch } = useData();
 
+    // Estado para facturas de planes
+const [planInvoices, setPlanInvoices] = useState([]);
+
+// Función para generar facturas desde clientes
+const generatePlanInvoices = useCallback(() => {
+  const generated = clients
+    .filter(client => client.plan_id)
+    .map(client => {
+      const plan = plans.find(p => p.id === client.plan_id);
+      return {
+        id: `inv-${client.id}`,
+        client_id: client.id,
+        client_name: client.name,
+        plan_id: plan?.id || null,
+        plan_name: plan?.name || 'Plan desconocido',
+        amount: plan?.price || 0,
+        period_start: client.start_date,
+        period_end: client.end_date,
+        status: new Date(client.end_date) >= new Date() ? 'active' : 'expired',
+        last_payment: client.last_payment,
+        created_at: new Date().toISOString().split('T')[0],
+        notes: `Factura generada automáticamente para el plan ${plan?.name || 'desconocido'}`
+      };
+    });
+  setPlanInvoices(generated);
+}, [clients, plans]);
+
+
   // Generate notifications
   const notifications = useMemo(() => {
     return generateNotifications(clients, inventory, machines);
   }, [clients, inventory, machines]);
 
+  useEffect(() => {
+  generatePlanInvoices();
+}, [clients, plans, generatePlanInvoices]);
+
   // Plan handlers
   const handleAddPlan = async (planData) => {
     try {
       await planService.create(planData);
-      alert('Plan agregado exitosamente');
+      toast.success('Plan agregado exitosamente');
       setShowPlanModal(false);
       setPlanForm({ name: '', price: 0, duration_days: 30, description: '' });
       refetch();
     } catch (error) {
       console.error('Error adding plan:', error);
-      alert('Error al agregar plan: ' + error.message);
+      toast.success('Error al agregar plan: ' + error.message);
     }
   };
 
@@ -155,11 +190,11 @@ const App = () => {
     
     try {
       await planService.delete(id);
-      alert('Plan eliminado exitosamente');
+      toast.success('Plan eliminado exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting plan:', error);
-      alert('Error al eliminar plan: ' + error.message);
+      toast.success('Error al eliminar plan: ' + error.message);
     }
   };
 
@@ -176,7 +211,7 @@ const App = () => {
       }
 
       await clientService.create(clientData);
-      alert('Cliente agregado exitosamente');
+      toast.success('Cliente agregado exitosamente');
       setShowClientModal(false);
       setClientForm({
         name: '',
@@ -191,7 +226,7 @@ const App = () => {
       refetch();
     } catch (error) {
       console.error('Error adding client:', error);
-      alert('Error al agregar cliente: ' + error.message);
+      toast.success('Error al agregar cliente: ' + error.message);
     }
   };
 
@@ -215,11 +250,11 @@ const App = () => {
     
     try {
       await clientService.delete(id);
-      alert('Cliente eliminado exitosamente');
+      toast.success('Cliente eliminado exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting client:', error);
-      alert('Error al eliminar cliente: ' + error.message);
+      toast.success('Error al eliminar cliente: ' + error.message);
     }
   };
 
@@ -227,13 +262,13 @@ const App = () => {
   const handleAddTrainer = async (trainerData) => {
     try {
       await trainerService.create(trainerData);
-      alert('Entrenador agregado exitosamente');
+      toast.success('Entrenador agregado exitosamente');
       setShowTrainerModal(false);
       setTrainerForm({ name: '', email: '', phone: '', specialization: '', status: 'active' });
       refetch();
     } catch (error) {
       console.error('Error adding trainer:', error);
-      alert('Error al agregar entrenador: ' + error.message);
+      toast.success('Error al agregar entrenador: ' + error.message);
     }
   };
 
@@ -247,11 +282,11 @@ const App = () => {
     
     try {
       await trainerService.delete(id);
-      alert('Entrenador eliminado exitosamente');
+      toast.success('Entrenador eliminado exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting trainer:', error);
-      alert('Error al eliminar entrenador: ' + error.message);
+      toast.success('Error al eliminar entrenador: ' + error.message);
     }
   };
 
@@ -259,7 +294,7 @@ const App = () => {
   const handleAddMachine = async (machineData) => {
     try {
       await machineService.create(machineData);
-      alert('Máquina agregada exitosamente');
+      toast.success('Máquina agregada exitosamente');
       setShowMachineModal(false);
       setMachineForm({
         name: '',
@@ -270,7 +305,7 @@ const App = () => {
       refetch();
     } catch (error) {
       console.error('Error adding machine:', error);
-      alert('Error al agregar máquina: ' + error.message);
+      toast.success('Error al agregar máquina: ' + error.message);
     }
   };
 
@@ -290,11 +325,11 @@ const App = () => {
     
     try {
       await machineService.delete(id);
-      alert('Máquina eliminada exitosamente');
+      toast.success('Máquina eliminada exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting machine:', error);
-      alert('Error al eliminar máquina: ' + error.message);
+      toast.success('Error al eliminar máquina: ' + error.message);
     }
   };
 
@@ -302,7 +337,7 @@ const App = () => {
   const handleAddInventory = async (inventoryData) => {
     try {
       await inventoryService.create(inventoryData);
-      alert('Producto agregado exitosamente');
+      toast.success('Producto agregado exitosamente');
       setShowInventoryModal(false);
       setInventoryForm({
         name: '',
@@ -321,7 +356,7 @@ const App = () => {
       refetch();
     } catch (error) {
       console.error('Error adding inventory:', error);
-      alert('Error al agregar producto: ' + error.message);
+      toast.success('Error al agregar producto: ' + error.message);
     }
   };
 
@@ -349,11 +384,11 @@ const App = () => {
     
     try {
       await inventoryService.delete(id);
-      alert('Producto eliminado exitosamente');
+      toast.success('Producto eliminado exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting inventory:', error);
-      alert('Error al eliminar producto: ' + error.message);
+      toast.success('Error al eliminar producto: ' + error.message);
     }
   };
 
@@ -384,12 +419,12 @@ const App = () => {
         created_by: 'admin'
       });
 
-      alert('Stock actualizado exitosamente');
+      toast.success('Stock actualizado exitosamente');
       setShowStockAdjustmentModal(false);
       refetch();
     } catch (error) {
       console.error('Error adjusting stock:', error);
-      alert('Error al ajustar el stock: ' + error.message);
+      toast.success('Error al ajustar el stock: ' + error.message);
     }
   };
 
@@ -401,7 +436,7 @@ const App = () => {
       setShowInventoryMovementsModal(true);
     } catch (error) {
       console.error('Error loading movements:', error);
-      alert('Error al cargar el historial: ' + error.message);
+      toast.success('Error al cargar el historial: ' + error.message);
     }
   };
 
@@ -409,7 +444,7 @@ const App = () => {
   const handleAddSalesInvoice = async (invoiceData) => {
     try {
       await salesInvoiceService.create(invoiceData);
-      alert('Factura de venta creada exitosamente');
+      toast.success('Factura de venta creada exitosamente');
       setShowSalesInvoiceModal(false);
       setSalesInvoiceForm({
         client_name: '',
@@ -421,7 +456,7 @@ const App = () => {
       refetch();
     } catch (error) {
       console.error('Error adding sales invoice:', error);
-      alert('Error al crear factura de venta: ' + error.message);
+      toast.success('Error al crear factura de venta: ' + error.message);
     }
   };
 
@@ -442,11 +477,11 @@ const App = () => {
     
     try {
       await salesInvoiceService.delete(id);
-      alert('Factura eliminada exitosamente');
+      toast.success('Factura eliminada exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting sales invoice:', error);
-      alert('Error al eliminar factura: ' + error.message);
+      toast.success('Error al eliminar factura: ' + error.message);
     }
   };
 
@@ -470,12 +505,12 @@ const App = () => {
           await inventoryConfigService.createUnit(configData);
           break;
       }
-      alert('Configuración guardada exitosamente');
+      toast.success('Configuración guardada exitosamente');
       setShowConfigModal(false);
       refetch();
     } catch (error) {
       console.error('Error saving config:', error);
-      alert('Error al guardar la configuración: ' + error.message);
+      toast.success('Error al guardar la configuración: ' + error.message);
     }
   };
 
@@ -505,13 +540,28 @@ const App = () => {
           await inventoryConfigService.deleteUnit(id);
           break;
       }
-      alert('Configuración eliminada exitosamente');
+      toast.success('Configuración eliminada exitosamente');
       refetch();
     } catch (error) {
       console.error('Error deleting config:', error);
-      alert('Error al eliminar la configuración: ' + error.message);
+      toast.success('Error al eliminar la configuración: ' + error.message);
     }
   };
+ 
+  // handlers facturaion plan
+  const handleMarkInvoiceAsPaid = async (invoiceId) => {
+  try {
+    await billingService.markAsPaid(invoiceId);
+    toast.success('Factura marcada como pagada');
+    // Opcional: actualizar el estado local
+    setPlanInvoices(prev => prev.map(inv => 
+      inv.id === invoiceId ? { ...inv, status: 'active' } : inv
+    ));
+  } catch (error) {
+    console.error('Error marcando factura como pagada:', error);
+    toast.success('Error al marcar factura como pagada');
+  }
+};
 
   if (loading) {
     return (
@@ -758,142 +808,150 @@ const App = () => {
               </div>
             )}
 
-            {activeTab === 'invoices' && (
+              {activeTab === 'invoices' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-bold text-gray-900">Facturación de Planes</h1>
+                    <button 
+                      onClick={() => {
+                        // Aquí podrías abrir un modal para generar factura manual
+                        toast.success('Generar factura manual (funcionalidad futura)');
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nueva Factura Manual
+                    </button>
+                  </div>
+                  <PlanInvoiceTable 
+                    invoices={planInvoices}
+                    onMarkAsPaid={handleMarkInvoiceAsPaid}
+                    searchTerm={searchTerm}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'inventory-config' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <h1 className="text-2xl font-bold text-gray-900">Facturación</h1>
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Factura
-                  </button>
+                  <h1 className="text-2xl font-bold text-gray-900">Configuración de Inventario</h1>
                 </div>
+                
                 <div className="bg-white rounded-lg shadow-sm p-6">
-                  <p className="text-gray-600">Módulo de facturación de planes (implementado en el futuro)</p>
+                  {/* Pestañas de configuración */}
+                  <div className="flex space-x-4 mb-6">
+                    <button
+                      onClick={() => {
+                        setActiveTab('inventory-config');
+                        setConfigSubTab('categories');
+                      }}
+                      className={`px-4 py-2 rounded-md font-medium ${
+                        configSubTab === 'categories' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Categorías
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('inventory-config');
+                        setConfigSubTab('locations');
+                      }}
+                      className={`px-4 py-2 rounded-md font-medium ${
+                        configSubTab === 'locations' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Ubicaciones
+                    </button>
+                    <button
+                      onClick={() => {
+                        setActiveTab('inventory-config');
+                        setConfigSubTab('units');
+                      }}
+                      className={`px-4 py-2 rounded-md font-medium ${
+                        configSubTab === 'units' 
+                          ? 'bg-blue-100 text-blue-700' 
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Unidades
+                    </button>
+                  </div>
+
+                  {/* Contenido de Categorías */}
+                  {configSubTab === 'categories' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900">Gestión de Categorías</h2>
+                        <button 
+                          onClick={() => handleAddConfig('category')}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Nueva Categoría
+                        </button>
+                      </div>
+                      <InventoryConfigTable 
+                        items={categories}
+                        onEdit={(item) => handleEditConfig(item, 'category')}
+                        onDelete={(id) => handleDeleteConfig(id, 'category')}
+                        configType="category"
+                        searchTerm={searchTerm}
+                      />
+                    </div>
+                  )}
+
+                  {/* Contenido de Ubicaciones */}
+                  {configSubTab === 'locations' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900">Gestión de Ubicaciones</h2>
+                        <button 
+                          onClick={() => handleAddConfig('location')}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Nueva Ubicación
+                        </button>
+                      </div>
+                      <InventoryConfigTable 
+                        items={locations}
+                        onEdit={(item) => handleEditConfig(item, 'location')}
+                        onDelete={(id) => handleDeleteConfig(id, 'location')}
+                        configType="location"
+                        searchTerm={searchTerm}
+                      />
+                    </div>
+                  )}
+
+                  {/* Contenido de Unidades */}
+                  {configSubTab === 'units' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900">Gestión de Unidades</h2>
+                        <button 
+                          onClick={() => handleAddConfig('unit')}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Nueva Unidad
+                        </button>
+                      </div>
+                      <InventoryConfigTable 
+                        items={units}
+                        onEdit={(item) => handleEditConfig(item, 'unit')}
+                        onDelete={(id) => handleDeleteConfig(id, 'unit')}
+                        configType="unit"
+                        searchTerm={searchTerm}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-
-            {activeTab === 'inventory-config' && (
-  <div className="space-y-6">
-    <div className="flex justify-between items-center">
-      <h1 className="text-2xl font-bold text-gray-900">Configuración de Inventario</h1>
-    </div>
-    
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      {/* Pestañas de configuración */}
-      <div className="flex space-x-4 mb-6">
-        <button
-          onClick={() => {
-            setActiveTab('inventory-config');
-            setConfigSubTab('categories');
-          }}
-          className={`px-4 py-2 rounded-md font-medium ${
-            configSubTab === 'categories' 
-              ? 'bg-blue-100 text-blue-700' 
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          Categorías
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('inventory-config');
-            setConfigSubTab('locations');
-          }}
-          className={`px-4 py-2 rounded-md font-medium ${
-            configSubTab === 'locations' 
-              ? 'bg-blue-100 text-blue-700' 
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          Ubicaciones
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('inventory-config');
-            setConfigSubTab('units');
-          }}
-          className={`px-4 py-2 rounded-md font-medium ${
-            configSubTab === 'units' 
-              ? 'bg-blue-100 text-blue-700' 
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
-        >
-          Unidades
-        </button>
-      </div>
-
-      {/* Contenido de Categorías */}
-      {configSubTab === 'categories' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">Gestión de Categorías</h2>
-            <button 
-              onClick={() => handleAddConfig('category')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Categoría
-            </button>
-          </div>
-          <InventoryConfigTable 
-            items={categories}
-            onEdit={(item) => handleEditConfig(item, 'category')}
-            onDelete={(id) => handleDeleteConfig(id, 'category')}
-            configType="category"
-            searchTerm={searchTerm}
-          />
-        </div>
-      )}
-
-      {/* Contenido de Ubicaciones */}
-      {configSubTab === 'locations' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">Gestión de Ubicaciones</h2>
-            <button 
-              onClick={() => handleAddConfig('location')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Ubicación
-            </button>
-          </div>
-          <InventoryConfigTable 
-            items={locations}
-            onEdit={(item) => handleEditConfig(item, 'location')}
-            onDelete={(id) => handleDeleteConfig(id, 'location')}
-            configType="location"
-            searchTerm={searchTerm}
-          />
-        </div>
-      )}
-
-      {/* Contenido de Unidades */}
-      {configSubTab === 'units' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">Gestión de Unidades</h2>
-            <button 
-              onClick={() => handleAddConfig('unit')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nueva Unidad
-            </button>
-          </div>
-          <InventoryConfigTable 
-            items={units}
-            onEdit={(item) => handleEditConfig(item, 'unit')}
-            onDelete={(id) => handleDeleteConfig(id, 'unit')}
-            configType="unit"
-            searchTerm={searchTerm}
-          />
-        </div>
-      )}
-    </div>
-  </div>
-)}
           </div>
         </div>
       </div>
