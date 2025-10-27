@@ -30,10 +30,11 @@ import { inventoryService } from './services/inventoryService';
 import { salesInvoiceService } from './services/salesInvoiceService';
 import { inventoryConfigService } from './services/inventoryConfigService';
 import { toast } from 'react-hot-toast';
+
 import { 
   Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, 
   LogOut, Plus, Edit, Trash2, Search, Package, CreditCard, 
-  AlertTriangle, Save, X, FileText, Camera, Minus, TrendingUp, 
+  AlertTriangle, RefreshCw, Save, X, FileText, Camera, Minus, TrendingUp, 
   TrendingDown 
 } from 'lucide-react';
 
@@ -110,6 +111,7 @@ const App = () => {
     status: 'paid'
   });
 
+ 
   // Estados adicionales para inventario
   const [showStockAdjustmentModal, setShowStockAdjustmentModal] = useState(false);
   const [showInventoryMovementsModal, setShowInventoryMovementsModal] = useState(false);
@@ -123,12 +125,18 @@ const App = () => {
     abbreviation: '',
     description: ''
   });
+
+   // Modal de confirmación para renovar plan
+  const [showRenewConfirmModal, setShowRenewConfirmModal] = useState(false);
+  const [clientToRenew, setClientToRenew] = useState(null);
+
   const [configType, setConfigType] = useState('category'); // 'category', 'location', 'unit'
   // En App.jsx, después de los otros estados  estado separado para las sub-pestañas
   const [configSubTab, setConfigSubTab] = useState('categories');
 
   const { clients, plans, trainers, machines, inventory, salesInvoices, categories, locations, units, loading, error, refetch } = useData();
-
+     console.log('Plans:', plans);
+     console.log('Trainers:', trainers);
     // Estado para facturas de planes
 const [planInvoices, setPlanInvoices] = useState([]);
 
@@ -230,7 +238,7 @@ const generatePlanInvoices = useCallback(() => {
     }
   };
 
-  const handleEditClient = (client) => {
+  /*const handleEditClient = (client) => {
     setClientForm({
       id: client.id,
       name: client.name,
@@ -243,7 +251,21 @@ const generatePlanInvoices = useCallback(() => {
       last_payment: client.last_payment
     });
     setShowClientModal(true);
-  };
+  };*/
+            const handleEditClient = async (clientData) => {
+          // ✅ Eliminar campos anidados antes de enviar
+          const { plans, trainers, created_at, updated_at, ...cleanData } = clientData;
+
+          try {
+            await clientService.update(clientData.id, cleanData);
+            toast.success('Cliente actualizado exitosamente');
+            setShowClientModal(false);
+            refetch();
+          } catch (error) {
+            console.error('Error updating client:', error);
+            toast.error('Error al actualizar cliente: ' + (error.message || 'Desconocido'));
+          }
+        };
 
   const handleDeleteClient = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este cliente?')) return;
@@ -562,6 +584,139 @@ const generatePlanInvoices = useCallback(() => {
     toast.success('Error al marcar factura como pagada');
   }
 };
+          // En App.jsx, entre tus handlers
+      /*const handleRenewClientPlan = async (client) => {
+        const plan = plans.find(p => p.id === client.plan_id);
+        if (!plan) {
+          toast.error('Plan no encontrado para renovación');
+          return;
+        }
+
+        try {
+          const newStartDate = new Date();
+          const newEndDate = new Date(newStartDate);
+          newEndDate.setDate(newStartDate.getDate() + plan.duration_days);
+
+          const updatedClient = {
+            ...client,
+            start_date: newStartDate.toISOString().split('T')[0],
+            end_date: newEndDate.toISOString().split('T')[0],
+            last_payment: newStartDate.toISOString().split('T')[0],
+            status: 'active'
+            //plan_id: client.plan_id // o plan.id si quieres cambiarlo
+          };
+
+          await clientService.update(client.id, updatedClient);
+          toast.success(`Plan renovado para ${client.name}`);
+          refetch();
+        } catch (error) {
+          console.error('Error renovando plan:', error);
+          toast.error('Error al renovar plan: ' + (error.message || 'Desconocido'));
+        }
+      };*/
+      // Renovar plan del cliente
+          
+      
+      /*const handleRenewClientPlan = async (client) => {
+            // ✅ Validación: asegurar que el cliente tenga un plan asignado
+            if (!client.plan_id) {
+              toast.error('Este cliente no tiene un plan asignado. Asigna uno primero.');
+              return;
+            }
+
+            const plan = plans.find(p => p.id === client.plan_id);
+            if (!plan) {
+              toast.error('Plan no encontrado para renovación');
+              return;
+            }
+
+            try {
+              const newStartDate = new Date();
+              const newEndDate = new Date(newStartDate);
+              newEndDate.setDate(newStartDate.getDate() + plan.duration_days);
+
+              // ✅ Solo enviar campos que existen en la tabla 'clients'
+              const updatedClient = {
+                name: client.name,
+                email: client.email,
+                plan_id: client.plan_id,
+                trainer_id: client.trainer_id,
+                start_date: newStartDate.toISOString().split('T')[0],
+                end_date: newEndDate.toISOString().split('T')[0],
+                last_payment: newStartDate.toISOString().split('T')[0],
+                status: 'active'
+              };
+
+              // ✅ Obtener resultado de la actualización
+              const result = await clientService.update(client.id, updatedClient);
+              if (!result) {
+                toast.error('No se pudo actualizar el cliente. Inténtalo de nuevo.');
+                return;
+              }
+
+              toast.success(`Plan renovado para ${client.name}`);
+              refetch();
+            } catch (error) {
+              console.error('Error renovando plan:', error);
+              toast.error('Error al renovar plan: ' + (error.message || 'Desconocido'));
+            }
+          };*/
+          // Abrir modal de confirmación para renovar
+            const handleRenewClientPlan = (client) => {
+              setClientToRenew(client);
+              setShowRenewConfirmModal(true);
+            };
+            // Confirmar y ejecutar la renovación
+              const confirmRenewPlan = async () => {
+                if (!clientToRenew) return;
+
+                const client = clientToRenew;
+                
+                // Validación: asegurar que el cliente tenga un plan asignado
+                if (!client.plan_id) {
+                  toast.error('Este cliente no tiene un plan asignado. Asigna uno primero.');
+                  setShowRenewConfirmModal(false);
+                  return;
+                }
+
+                const plan = plans.find(p => p.id === client.plan_id);
+                if (!plan) {
+                  toast.error('Plan no encontrado para renovación');
+                  setShowRenewConfirmModal(false);
+                  return;
+                }
+
+                try {
+                  const newStartDate = new Date();
+                  const newEndDate = new Date(newStartDate);
+                  newEndDate.setDate(newStartDate.getDate() + plan.duration_days);
+
+                  const updatedClient = {
+                    name: client.name,
+                    email: client.email,
+                    plan_id: client.plan_id,
+                    trainer_id: client.trainer_id,
+                    start_date: newStartDate.toISOString().split('T')[0],
+                    end_date: newEndDate.toISOString().split('T')[0],
+                    last_payment: newStartDate.toISOString().split('T')[0],
+                    status: 'active'
+                  };
+
+                  const result = await clientService.update(client.id, updatedClient);
+                  if (!result) {
+                    toast.error('No se pudo actualizar el cliente. Inténtalo de nuevo.');
+                    return;
+                  }
+
+                  toast.success(`Plan renovado para ${client.name}`);
+                  setShowRenewConfirmModal(false);
+                  refetch();
+                } catch (error) {
+                  console.error('Error renovando plan:', error);
+                  toast.error('Error al renovar plan: ' + (error.message || 'Desconocido'));
+                  setShowRenewConfirmModal(false);
+                }
+              };
 
   if (loading) {
     return (
@@ -701,8 +856,11 @@ const generatePlanInvoices = useCallback(() => {
                 </div>
                 <ClientTable 
                   clients={clients}
+                  plans={plans}
+                  trainers={trainers} 
                   onEdit={handleEditClient}
                   onDelete={handleDeleteClient}
+                  onRenew={handleRenewClientPlan}
                   searchTerm={searchTerm}
                 />
               </div>
@@ -1036,6 +1194,42 @@ const generatePlanInvoices = useCallback(() => {
         isEditing={!!configForm.id}
         configType={configType}
       />
+        {/* Modal de confirmación para renovar plan */}
+{showRenewConfirmModal && clientToRenew && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+      <div className="p-6">
+        <div className="flex items-center mb-4">
+          <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2" />
+          <h3 className="text-lg font-medium text-gray-900">Confirmar renovación</h3>
+        </div>
+        <p className="text-gray-700 mb-4">
+          ¿Estás seguro de que deseas renovar el plan de <span className="font-semibold">{clientToRenew.name}</span>?
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          Se generará una nueva membresía con fecha de inicio hoy y duración del plan actual.
+        </p>
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setShowRenewConfirmModal(false)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirmRenewPlan}
+            className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md flex items-center"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Renovar Plan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 };
