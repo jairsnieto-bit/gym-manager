@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const PlanModal = ({ 
   isOpen, 
@@ -16,7 +17,7 @@ const PlanModal = ({
     if (planForm.name && planForm.price >= 0 && planForm.duration_days > 0) {
       onSave(planForm);
     } else {
-      alert('Por favor, completa todos los campos correctamente');
+      toast.error('Por favor, completa todos los campos correctamente');
     }
   };
 

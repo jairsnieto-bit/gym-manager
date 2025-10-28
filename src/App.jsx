@@ -189,9 +189,29 @@ const generatePlanInvoices = useCallback(() => {
   };
 
   const handleEditPlan = (plan) => {
-    setPlanForm(plan);
-    setShowPlanModal(true);
+    setPlanForm({
+    id: plan.id,
+    name: plan.name,
+    price: plan.price,
+    duration_days: plan.duration_days,
+    description: plan.description
+  });
+  setShowPlanModal(true);
   };
+
+
+      // Actualizar plan existente
+      const handleUpdatePlan = async (planData) => {
+        try {
+          await planService.update(planData.id, planData);
+          toast.success('Plan actualizado exitosamente');
+          setShowPlanModal(false);
+          refetch();
+        } catch (error) {
+          console.error('Error updating plan:', error);
+          toast.error('Error al actualizar plan: ' + (error.message || 'Desconocido'));
+        }
+      };
 
   const handleDeletePlan = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este plan?')) return;
@@ -206,66 +226,88 @@ const generatePlanInvoices = useCallback(() => {
     }
   };
 
-  // Client handlers
-  const handleAddClient = async (clientData) => {
-    try {
-      // Calcular end_date basado en la duración del plan
-      const selectedPlan = plans.find(plan => plan.id === clientData.plan_id);
-      if (selectedPlan) {
-        const startDate = new Date(clientData.start_date);
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
-        clientData.end_date = endDate.toISOString().split('T')[0];
+    // Agregar nuevo cliente
+    const handleAddClient = async (clientData) => {
+      try {
+        // Calcular end_date basado en la duración del plan
+        const selectedPlan = plans.find(plan => plan.id === clientData.plan_id);
+        if (selectedPlan) {
+          const startDate = new Date(clientData.start_date);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
+          clientData.end_date = endDate.toISOString().split('T')[0];
+        }
+
+        await clientService.create(clientData);
+        toast.success('Cliente agregado exitosamente');
+        setShowClientModal(false);
+        setClientForm({
+          name: '',
+          email: '',
+          plan_id: '',
+          trainer_id: null,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: '',
+          status: 'active',
+          last_payment: new Date().toISOString().split('T')[0]
+        });
+        refetch();
+      } catch (error) {
+        console.error('Error adding client:', error);
+        toast.error('Error al agregar cliente: ' + (error.message || 'Desconocido'));
       }
+    };
 
-      await clientService.create(clientData);
-      toast.success('Cliente agregado exitosamente');
-      setShowClientModal(false);
-      setClientForm({
-        name: '',
-        email: '',
-        plan_id: '',
-        trainer_id: null,
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: '',
-        status: 'active',
-        last_payment: new Date().toISOString().split('T')[0]
-      });
-      refetch();
-    } catch (error) {
-      console.error('Error adding client:', error);
-      toast.success('Error al agregar cliente: ' + error.message);
-    }
-  };
+          // Actualizar cliente existente
+          const handleUpdateClient = async (clientData) => {
+            try {
+              // Validar que plans exista
+              if (!plans || !Array.isArray(plans)) {
+                toast.error('No se pudieron cargar los planes. Inténtalo de nuevo.');
+                return;
+              }
 
-  /*const handleEditClient = (client) => {
-    setClientForm({
-      id: client.id,
-      name: client.name,
-      email: client.email,
-      plan_id: client.plan_id,
-      trainer_id: client.trainer_id,
-      start_date: client.start_date,
-      end_date: client.end_date,
-      status: client.status,
-      last_payment: client.last_payment
-    });
-    setShowClientModal(true);
-  };*/
-            const handleEditClient = async (clientData) => {
-          // ✅ Eliminar campos anidados antes de enviar
-          const { plans, trainers, created_at, updated_at, ...cleanData } = clientData;
+              // Calcular end_date si cambia el plan
+              let selectedPlan = null;
+              if (plans && Array.isArray(plans)) {
+                selectedPlan = plans.find(plan => plan.id === clientData.plan_id);
+              }
 
-          try {
-            await clientService.update(clientData.id, cleanData);
-            toast.success('Cliente actualizado exitosamente');
-            setShowClientModal(false);
-            refetch();
-          } catch (error) {
-            console.error('Error updating client:', error);
-            toast.error('Error al actualizar cliente: ' + (error.message || 'Desconocido'));
-          }
+              if (selectedPlan) {
+                const startDate = new Date(clientData.start_date);
+                const endDate = new Date(startDate);
+                endDate.setDate(startDate.getDate() + selectedPlan.duration_days);
+                clientData.end_date = endDate.toISOString().split('T')[0];
+              }
+
+              // ✅ Eliminar campos anidados antes de enviar
+              const { trainers, created_at, updated_at, ...cleanData } = clientData;
+              await clientService.update(clientData.id, cleanData);
+              toast.success('Cliente actualizado exitosamente');
+              setShowClientModal(false);
+              refetch();
+            } catch (error) {
+              console.error('Error updating client:', error);
+              toast.error('Error al actualizar cliente: ' + (error.message || 'Desconocido'));
+            }
+          };
+
+                    // ✅ SOLO abre el modal con los datos del cliente (NO guarda)
+        const handleEditClient = (client) => {
+          setClientForm({
+            id: client.id,
+            name: client.name,
+            email: client.email,
+            plan_id: client.plan_id || '',
+            trainer_id: client.trainer_id || null,
+            start_date: client.start_date || new Date().toISOString().split('T')[0],
+            end_date: client.end_date || '',
+            status: client.status || 'active',
+            last_payment: client.last_payment || new Date().toISOString().split('T')[0]
+          });
+          setShowClientModal(true); // 👈 Esto abre el modal
         };
+          
 
   const handleDeleteClient = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este cliente?')) return;
@@ -281,7 +323,7 @@ const generatePlanInvoices = useCallback(() => {
   };
 
   // Trainer handlers
-  const handleAddTrainer = async (trainerData) => {
+  /*const handleAddTrainer = async (trainerData) => {
     try {
       await trainerService.create(trainerData);
       toast.success('Entrenador agregado exitosamente');
@@ -310,7 +352,50 @@ const generatePlanInvoices = useCallback(() => {
       console.error('Error deleting trainer:', error);
       toast.success('Error al eliminar entrenador: ' + error.message);
     }
-  };
+  };*/
+
+        // Agregar nuevo entrenador
+    const handleAddTrainer = async (trainerData) => {
+      try {
+        await trainerService.create(trainerData);
+        toast.success('Entrenador agregado exitosamente');
+        setShowTrainerModal(false);
+        setTrainerForm({ name: '', email: '', phone: '', specialization: '', status: 'active' });
+        refetch();
+      } catch (error) {
+        console.error('Error adding trainer:', error);
+        toast.error('Error al agregar entrenador: ' + (error.message || 'Desconocido'));
+      }
+    };
+      const handleEditTrainer = (trainer) => {
+      setTrainerForm(trainer);
+      setShowTrainerModal(true);
+      };
+    // Actualizar entrenador existente
+    const handleUpdateTrainer = async (trainerData) => {
+      try {
+        await trainerService.update(trainerData.id, trainerData);
+        toast.success('Entrenador actualizado exitosamente');
+        setShowTrainerModal(false);
+        refetch();
+      } catch (error) {
+        console.error('Error updating trainer:', error);
+        toast.error('Error al actualizar entrenador: ' + (error.message || 'Desconocido'));
+      }
+    };
+
+     const handleDeleteTrainer = async (id) => {
+    if (!window.confirm('¿Estás seguro de eliminar este entrenador?')) return;
+    
+    try {
+      await trainerService.delete(id);
+      toast.success('Entrenador eliminado exitosamente');
+      refetch();
+    } catch (error) {
+      console.error('Error deleting trainer:', error);
+      toast.success('Error al eliminar entrenador: ' + error.message);
+    }
+  }; 
 
   // Machine handlers
   const handleAddMachine = async (machineData) => {
@@ -328,6 +413,20 @@ const generatePlanInvoices = useCallback(() => {
     } catch (error) {
       console.error('Error adding machine:', error);
       toast.success('Error al agregar máquina: ' + error.message);
+    }
+  };
+
+
+  // Actualizar máquina existente
+  const handleUpdateMachine = async (machineData) => {
+    try {
+      await machineService.update(machineData.id, machineData);
+      toast.success('Máquina actualizada exitosamente');
+      setShowMachineModal(false);
+      refetch();
+    } catch (error) {
+      console.error('Error updating machine:', error);
+      toast.error('Error al actualizar máquina: ' + (error.message || 'Desconocido'));
     }
   };
 
@@ -356,7 +455,7 @@ const generatePlanInvoices = useCallback(() => {
   };
 
   // Inventory handlers
-  const handleAddInventory = async (inventoryData) => {
+  /*const handleAddInventory = async (inventoryData) => {
     try {
       await inventoryService.create(inventoryData);
       toast.success('Producto agregado exitosamente');
@@ -399,7 +498,68 @@ const generatePlanInvoices = useCallback(() => {
       description: item.description || ''
     });
     setShowInventoryModal(true);
+  };*/
+
+    // Agregar nuevo producto
+  const handleAddInventory = async (inventoryData) => {
+    try {
+      await inventoryService.create(inventoryData);
+      toast.success('Producto agregado exitosamente');
+      setShowInventoryModal(false);
+      setInventoryForm({
+        name: '',
+        category: 'Supplements',
+        stock: 0,
+        price: 0,
+        min_stock: 5,
+        supplier: '',
+        barcode: '',
+        cost_price: 0,
+        reorder_point: 0,
+        location: 'General',
+        unit: 'Unidad',
+        description: ''
+      });
+      refetch();
+    } catch (error) {
+      console.error('Error adding inventory:', error);
+      toast.error('Error al agregar producto: ' + (error.message || 'Desconocido'));
+    }
   };
+
+    const handleEditInventory = (item) => {
+    setInventoryForm({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      stock: item.stock,
+      price: item.price,
+      min_stock: item.min_stock,
+      supplier: item.supplier || '',
+      barcode: item.barcode || '',
+      cost_price: item.cost_price || 0,
+      reorder_point: item.reorder_point || 0,
+      location: item.location || 'General',
+      unit: item.unit || 'Unidad',
+      description: item.description || ''
+    });
+    setShowInventoryModal(true);
+  };
+
+
+  // Actualizar producto existente
+  const handleUpdateInventory = async (inventoryData) => {
+    try {
+      await inventoryService.update(inventoryData.id, inventoryData);
+      toast.success('Producto actualizado exitosamente');
+      setShowInventoryModal(false);
+      refetch();
+    } catch (error) {
+      console.error('Error updating inventory:', error);
+      toast.error('Error al actualizar producto: ' + (error.message || 'Desconocido'));
+    }
+  };
+
 
   const handleDeleteInventory = async (id) => {
     if (!window.confirm('¿Estás seguro de eliminar este producto?')) return;
@@ -1119,7 +1279,7 @@ const generatePlanInvoices = useCallback(() => {
         onClose={() => setShowPlanModal(false)}
         planForm={planForm}
         setPlanForm={setPlanForm}
-        onSave={handleAddPlan}
+        onSave={planForm.id ? handleUpdatePlan : handleAddPlan}
         isEditing={!!planForm.id}
       />
 
@@ -1128,7 +1288,7 @@ const generatePlanInvoices = useCallback(() => {
         onClose={() => setShowClientModal(false)}
         clientForm={clientForm}
         setClientForm={setClientForm}
-        onSave={handleAddClient}
+        onSave={clientForm.id ? handleUpdateClient : handleAddClient}
         isEditing={!!clientForm.id}
         plans={plans}
         trainers={trainers}
@@ -1139,7 +1299,7 @@ const generatePlanInvoices = useCallback(() => {
         onClose={() => setShowTrainerModal(false)}
         trainerForm={trainerForm}
         setTrainerForm={setTrainerForm}
-        onSave={handleAddTrainer}
+        onSave={trainerForm.id ? handleUpdateTrainer : handleAddTrainer}
         isEditing={!!trainerForm.id}
       />
 
@@ -1148,7 +1308,7 @@ const generatePlanInvoices = useCallback(() => {
         onClose={() => setShowMachineModal(false)}
         machineForm={machineForm}
         setMachineForm={setMachineForm}
-        onSave={handleAddMachine}
+        onSave={machineForm.id ? handleUpdateMachine : handleAddMachine}
         isEditing={!!machineForm.id}
       />
 
@@ -1157,8 +1317,11 @@ const generatePlanInvoices = useCallback(() => {
         onClose={() => setShowInventoryModal(false)}
         inventoryForm={inventoryForm}
         setInventoryForm={setInventoryForm}
-        onSave={handleAddInventory}
+        onSave={inventoryForm.id ? handleUpdateInventory : handleAddInventory} 
         isEditing={!!inventoryForm.id}
+        categories={categories}   // 👈
+        locations={locations}     // 👈
+        units={units} 
       />
 
       <SalesInvoiceModal

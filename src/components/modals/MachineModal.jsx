@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const MachineModal = ({ 
   isOpen, 
@@ -16,7 +17,7 @@ const MachineModal = ({
     if (machineForm.name && machineForm.category) {
       onSave(machineForm);
     } else {
-      alert('Por favor, completa los campos obligatorios');
+      toast.error('Por favor, completa los campos obligatorios');
     }
   };
 

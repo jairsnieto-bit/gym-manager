@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Camera } from 'lucide-react';
 import { inventoryService } from '../../services/inventoryService';
+import { toast } from 'react-hot-toast';
 const InventoryModal = ({ 
   isOpen, 
   onClose, 
@@ -9,7 +10,8 @@ const InventoryModal = ({
   onSave,
   isEditing,
   categories = [],
-  locations = []
+  locations = [],
+  units = [] 
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
@@ -35,14 +37,19 @@ const InventoryModal = ({
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (inventoryForm.name && inventoryForm.category) {
-      onSave(inventoryForm);
-    } else {
-      alert('Por favor, completa los campos obligatorios');
-    }
-  };
+ const handleSubmit = (e) => {
+  e.preventDefault();
+  if (
+    inventoryForm.name && 
+    inventoryForm.category && 
+    inventoryForm.location && 
+    inventoryForm.unit
+  ) {
+    onSave(inventoryForm);
+  } else {
+    toast.error('Por favor, completa todos los campos obligatorios');
+  }
+};
 
   if (!isOpen) return null;
 
@@ -99,16 +106,16 @@ const InventoryModal = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">Categoría *</label>
               <div className="flex space-x-2">
                 <select
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={inventoryForm.category}
-                  onChange={(e) => setInventoryForm({...inventoryForm, category: e.target.value})}
-                  required
-                >
-                  <option value="">Selecciona una categoría</option>
-                  {categories.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={inventoryForm.category}
+                    onChange={(e) => setInventoryForm({...inventoryForm, category: e.target.value})}
+                    required
+                  >
+                    <option value="">Selecciona una categoría</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                 <button
                   type="button"
                   onClick={() => setShowAdvanced(!showAdvanced)}
@@ -204,27 +211,33 @@ const InventoryModal = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={inventoryForm.location || 'General'}
-                onChange={(e) => setInventoryForm({...inventoryForm, location: e.target.value})}
-              >
-                <option value="General">General</option>
-                {locations.map(location => (
-                  <option key={location} value={location}>{location}</option>
-                ))}
-              </select>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={inventoryForm.location || ''}
+                  onChange={(e) => setInventoryForm({...inventoryForm, location: e.target.value})}
+                  required
+                >
+                  <option value="">Selecciona una ubicación</option>
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.name}>{loc.name}</option>
+                  ))}
+                </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={inventoryForm.unit || 'Unidad'}
-                onChange={(e) => setInventoryForm({...inventoryForm, unit: e.target.value})}
-              />
+            <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={inventoryForm.unit || ''}
+                  onChange={(e) => setInventoryForm({...inventoryForm, unit: e.target.value})}
+                  required
+                >
+                  <option value="">Selecciona una unidad</option>
+                  {units.map(unit => (
+                    <option key={unit.id} value={unit.name}>{unit.name}</option>
+                  ))}
+                </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>

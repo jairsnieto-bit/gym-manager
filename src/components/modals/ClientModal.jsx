@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const ClientModal = ({ 
   isOpen, 
@@ -18,7 +19,7 @@ const ClientModal = ({
     if (clientForm.name && clientForm.email && clientForm.plan_id) {
       onSave(clientForm);
     } else {
-      alert('Por favor, completa los campos obligatorios');
+      toast.error('Por favor, completa los campos obligatorios');
     }
   };
 
