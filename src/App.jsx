@@ -30,6 +30,8 @@ import { inventoryService } from './services/inventoryService';
 import { salesInvoiceService } from './services/salesInvoiceService';
 import { inventoryConfigService } from './services/inventoryConfigService';
 import { toast } from 'react-hot-toast';
+import PosView  from './components/pos/PosView';
+
 
 import { 
   Users, Dumbbell, ShoppingCart, Calendar, Bell, User, Settings, 
@@ -623,24 +625,16 @@ const generatePlanInvoices = useCallback(() => {
   };
 
   // Sales Invoice handlers
-  const handleAddSalesInvoice = async (invoiceData) => {
-    try {
-      await salesInvoiceService.create(invoiceData);
-      toast.success('Factura de venta creada exitosamente');
-      setShowSalesInvoiceModal(false);
-      setSalesInvoiceForm({
-        client_name: '',
-        items: [],
-        total: 0,
-        date: new Date().toISOString().split('T')[0],
-        status: 'paid'
-      });
-      refetch();
-    } catch (error) {
-      console.error('Error adding sales invoice:', error);
-      toast.success('Error al crear factura de venta: ' + error.message);
-    }
-  };
+const handleAddSalesInvoice = async (invoiceData) => {
+  try {
+    await salesInvoiceService.create(invoiceData);
+    toast.success('Venta registrada exitosamente');
+    refetch();
+  } catch (error) {
+    console.error('Error adding sales invoice:', error);
+    toast.error('Error al registrar la venta: ' + (error.message || 'Desconocido'));
+  }
+};
 
   const handleEditSalesInvoice = (invoice) => {
     setSalesInvoiceForm({
@@ -1099,29 +1093,22 @@ const generatePlanInvoices = useCallback(() => {
             {activeTab === 'shop' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <h1 className="text-2xl font-bold text-gray-900">Tienda</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">Punto de Venta</h1>
+                  {/* Botón de historial de ventas (opcional) */}
                   <button 
-                    onClick={() => {
-                      setSalesInvoiceForm({
-                        client_name: '',
-                        items: [],
-                        total: 0,
-                        date: new Date().toISOString().split('T')[0],
-                        status: 'paid'
-                      });
-                      setShowSalesInvoiceModal(true);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                    onClick={() => setActiveTab('sales-history')}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nueva Venta
+                    <FileText className="h-4 w-4 mr-2" />
+                    Historial de Ventas
                   </button>
                 </div>
-                <SalesInvoiceTable 
-                  invoices={salesInvoices}
-                  onEdit={handleEditSalesInvoice}
-                  onDelete={handleDeleteSalesInvoice}
+                <PosView 
+                  inventory={inventory}
+                  clients={clients}
+                  onSaleComplete={handleAddSalesInvoice}
                   searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
                 />
               </div>
             )}
