@@ -49,7 +49,7 @@ export const useData = () => {
         inventoryConfigService.getUnits()
       ]);
 
-      console.log('Datos cargados:', {
+      /*console.log('Datos cargados:', {
         clients: clientsData.length,
         plans: plansData.length,
         trainers: trainersData.length,
@@ -59,7 +59,7 @@ export const useData = () => {
         categories: categoriesData.length,
         locations: locationsData.length,
         units: unitsData.length
-      });
+      });*/
 
       setClients(clientsData);
       setPlans(plansData);

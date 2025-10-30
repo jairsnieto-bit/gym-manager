@@ -4,6 +4,7 @@ import { Search, Plus, Minus, X, CreditCard, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useReactToPrint } from 'react-to-print';
 import Ticket from './Ticket';
+import { Printer } from 'lucide-react';
 
 const PosView = ({ 
   inventory, 
@@ -17,7 +18,8 @@ const PosView = ({
   const [showClientModal, setShowClientModal] = useState(false);
   const componentRef = useRef();
   const [currentSale, setCurrentSale] = useState(null);
-
+  const [isPrinting, setIsPrinting] = useState(false);  
+  const [showPrintButton, setShowPrintButton] = useState(false);
   // Filtrar productos
   const filteredInventory = inventory.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -25,7 +27,7 @@ const PosView = ({
   );
 
   // Agregar producto al carrito
-  const addToCart = (item) => {
+  /*const addToCart = (item) => {
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id);
       if (existing) {
@@ -38,10 +40,35 @@ const PosView = ({
       return [...prev, { ...item, quantity: 1 }];
     });
     setSearchTerm(''); // Limpiar búsqueda
-  };
+  };*/
+    const addToCart = (item) => {
+  // ✅ Verificar si hay stock suficiente
+        if (item.stock <= 0) {
+            toast.error(`No hay stock disponible para: ${item.name}`);
+            return;
+        }
+
+        setCart(prev => {
+            const existing = prev.find(c => c.id === item.id);
+            if (existing) {
+            // ✅ Verificar si hay stock suficiente para incrementar
+            if (existing.quantity + 1 > item.stock) {
+                toast.error(`Solo quedan ${item.stock} unidades de: ${item.name}`);
+                return prev;
+            }
+            return prev.map(c => 
+                c.id === item.id 
+                ? { ...c, quantity: c.quantity + 1 }
+                : c
+            );
+            }
+            return [...prev, { ...item, quantity: 1 }];
+        });
+        setSearchTerm('');
+        }
 
   // Actualizar cantidad
-  const updateQuantity = (id, quantity) => {
+  /*const updateQuantity = (id, quantity) => {
     if (quantity <= 0) {
       removeFromCart(id);
       return;
@@ -51,7 +78,29 @@ const PosView = ({
         item.id === id ? { ...item, quantity } : item
       )
     );
-  };
+  };*/
+
+    const updateQuantity = (id, quantity) => {
+        if (quantity <= 0) {
+            removeFromCart(id);
+            return;
+        }
+
+        const item = cart.find(c => c.id === id);
+        if (!item) return;
+
+        // ✅ Verificar si la nueva cantidad excede el stock
+        if (quantity > item.stock) {
+            toast.error(`Solo quedan ${item.stock} unidades de: ${item.name}`);
+            return;
+        }
+
+        setCart(prev => 
+            prev.map(item => 
+            item.id === id ? { ...item, quantity } : item
+            )
+        );
+        };
 
   // Eliminar del carrito
   const removeFromCart = (id) => {
@@ -63,49 +112,49 @@ const PosView = ({
     cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   , [cart]);
 
-  // ✅ SOLO UNA declaración de processSale
-  const processSale = async () => {
-    if (cart.length === 0) {
-      toast.error('El carrito está vacío');
-      return;
-    }
+        // ✅ SOLO UNA declaración de processSale
+        const processSale = async () => {
+        if (cart.length === 0) {
+            toast.error('El carrito está vacío');
+            return;
+        }
 
-    // ⚠️ NO incluir client_id (no existe en sales_invoices)
-    const saleData = {
-      client_name: selectedClient?.name || 'Cliente ocasional',
-      items: cart.map(item => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        total: item.price * item.quantity
-      })),
-      total,
-      status: 'paid',
-      date: new Date().toISOString().split('T')[0]
-    };
+        const saleData = {
+            client_name: selectedClient?.name || 'Cliente ocasional',
+            items: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            total: item.price * item.quantity
+            })),
+            total,
+            status: 'paid',
+            date: new Date().toISOString().split('T')[0]
+        };
 
-    try {
-      await onSaleComplete(saleData);
-      setCurrentSale(saleData); // Para imprimir
-      setCart([]);
-      setSelectedClient(null);
-      toast.success('Venta realizada exitosamente');
-      
-      // Imprimir después de un breve retraso
-      setTimeout(() => {
-        handlePrint();
-      }, 100);
-    } catch (error) {
-      console.error('Error processing sale:', error);
-      toast.error('Error al procesar la venta');
-    }
-  };
+            try {
+            await onSaleComplete(saleData);
+            setCurrentSale(saleData);
+            setCart([]);
+            setSelectedClient(null);
+            toast.success('Venta realizada exitosamente');
+              
+            setShowPrintButton(true); // 👈 Muestra el botón de imprimir
+            } catch (error) {
+            console.error('Error processing sale:', error);
+            toast.error('Error al procesar la venta');
+            }
+        };
 
   // Función para imprimir
-  const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
-  });
+        const handlePrint = useReactToPrint({
+        content: () => componentRef.current,
+        onAfterPrint: () => {
+            setIsPrinting(false);
+            setCurrentSale(null);
+        },
+        });
 
   return (
     <>
@@ -116,6 +165,7 @@ const PosView = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <input
+                id="product-search"
                 type="text"
                 placeholder="Buscar producto por nombre o código..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -131,9 +181,11 @@ const PosView = ({
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 max-h-96 overflow-y-auto">
               {filteredInventory.map(item => (
                 <div 
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className="border border-gray-200 rounded-lg p-3 hover:bg-blue-50 cursor-pointer transition"
+                   key={item.id}
+                    onClick={() => item.stock > 0 && addToCart(item)} // 👈 Solo clickable si hay stock
+                    className={`border border-gray-200 rounded-lg p-3 cursor-pointer transition ${
+                    item.stock <= 0 ? 'opacity-50 pointer-events-none' : 'hover:bg-blue-50'
+                    }`}
                 >
                   <div className="text-sm font-medium text-gray-900 truncate">
                     {item.name}
@@ -240,8 +292,24 @@ const PosView = ({
               <CreditCard className="h-5 w-5 mr-2" />
               Procesar Pago
             </button>
+
+               {showPrintButton && (
+                <button
+                    onClick={() => {
+                    handlePrint();
+                    setShowPrintButton(false); // Oculta el botón después de imprimir
+                    }}
+                    className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 flex items-center justify-center mt-2"
+                >
+                    <Printer className="h-5 w-5 mr-2" />
+                    Imprimir Ticket
+                </button>
+                )}
+
           </div>
         </div>
+
+           
 
         {/* Modal de selección de cliente (simple) */}
         {showClientModal && (
@@ -281,10 +349,12 @@ const PosView = ({
         )}
       </div>
 
-      {/* Componente de ticket (oculto visualmente) */}
-      <div style={{ display: 'none' }}>
-        <Ticket ref={componentRef} sale={currentSale} />
-      </div>
+      {/* Componente de ticket (siempre disponible si hay venta) */}
+        {currentSale && (
+        <div style={{ display: 'none' }}>
+            <Ticket ref={componentRef} sale={currentSale} />
+        </div>
+        )}
     </>
   );
 };
